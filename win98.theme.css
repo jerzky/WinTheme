@@ -1,0 +1,1002 @@
+/**
+ * @name Windows 98
+ * @author your-name
+ * @version 0.1.0
+ * @description Teal desktop, silver beveled windows, navy title bars. Built for the 2025+ Discord "visual refresh" client.
+ */
+
+/* =============================================================================
+   HOW THIS THEME TRIES TO SURVIVE DISCORD UPDATES
+   -----------------------------------------------------------------------------
+   1. Most of the colours come from overriding Discord's own CSS variables,
+      using the names a live client actually defines (see section 1b). If a
+      future update renames one, only that line needs changing.
+   2. When we have to target an element, we never use a full hashed class like
+      "sidebar_c48ade". Instead we use one of two partial matches:
+        [class*="foo_"]                          -> any class CONTAINING "foo_"
+        [class^="foo_"], [class*=" foo_"]        -> a class that STARTS with "foo_"
+      The second form ("word-boundary match") avoids accidents like
+      [class*="bar_"] also matching "sidebar_", "scrollbar_" and "toolbar_".
+   3. Everything uses !important. Discord loads its stylesheets lazily, often
+      after ours, so plain specificity isn't reliable.
+   ============================================================================= */
+
+
+/* =============================================================================
+   0. FONTS
+   -----------------------------------------------------------------------------
+   The pixel font from 98.css (MIT, Jordan Scales), served by jsDelivr, which is
+   on Vencord's CSP allowlist. If it gets blocked, the fallbacks in --w98-font
+   take over (Microsoft Sans Serif ships with Windows and looks close).
+   ============================================================================= */
+
+@font-face {
+  font-family: "Pixelated MS Sans Serif";
+  src: url("https://cdn.jsdelivr.net/npm/98.css@0.1.21/dist/ms_sans_serif.woff2") format("woff2"),
+       url("https://cdn.jsdelivr.net/npm/98.css@0.1.21/dist/ms_sans_serif.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Pixelated MS Sans Serif";
+  src: url("https://cdn.jsdelivr.net/npm/98.css@0.1.21/dist/ms_sans_serif_bold.woff2") format("woff2"),
+       url("https://cdn.jsdelivr.net/npm/98.css@0.1.21/dist/ms_sans_serif_bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+}
+
+
+/* =============================================================================
+   1. VARIABLES
+   ============================================================================= */
+
+/* --- 1a. Our own palette and bevels. Change things here first. ------------- */
+:root {
+  --w98-desktop:      #008080;  /* teal desktop                              */
+  --w98-face:         #c0c0c0;  /* button face / window body                 */
+  --w98-light:        #dfdfdf;  /* inner highlight                           */
+  --w98-white:        #ffffff;  /* outer highlight, field background         */
+  --w98-shadow:       #808080;  /* inner shadow, disabled text               */
+  --w98-dark:         #0a0a0a;  /* outer shadow                              */
+  --w98-text:         #000000;
+  --w98-select:       #000080;  /* selection / highlight background          */
+  --w98-select-text:  #ffffff;
+  --w98-title-start:  #000080;
+  --w98-title-end:    #1084d0;
+  --w98-tooltip:      #ffffe1;
+  --w98-link:         #0000ee;
+  --w98-scroll-inset: 5px;      /* gap above/below the chat & sidebar scrollbars */
+
+  --w98-font: "Pixelated MS Sans Serif", "MS Sans Serif", "Microsoft Sans Serif",
+              Tahoma, Arial, sans-serif;
+  --w98-font-mono: "Fixedsys Excelsior 3.01", "Fixedsys", "Lucida Console",
+                   "Courier New", monospace;
+
+  /* Bevels, straight from 98.css. Used as box-shadow values.                  */
+  /* Raised: buttons, scrollbar thumb.                                         */
+  --w98-raised:
+    inset -1px -1px var(--w98-dark),  inset 1px 1px var(--w98-white),
+    inset -2px -2px var(--w98-shadow), inset 2px 2px var(--w98-light);
+  /* Window: panels, menus, dialogs (slightly softer top-left than a button). */
+  --w98-window:
+    inset -1px -1px var(--w98-dark),  inset 1px 1px var(--w98-light),
+    inset -2px -2px var(--w98-shadow), inset 2px 2px var(--w98-white);
+  /* Sunken: text inputs, code blocks, list boxes.                             */
+  --w98-sunken:
+    inset -1px -1px var(--w98-white), inset 1px 1px var(--w98-shadow),
+    inset -2px -2px var(--w98-light), inset 2px 2px var(--w98-dark);
+  /* Pressed: a button while held down.                                        */
+  --w98-pressed:
+    inset -1px -1px var(--w98-white), inset 1px 1px var(--w98-dark),
+    inset -2px -2px var(--w98-light), inset 2px 2px var(--w98-shadow);
+  /* Thin 1px groove, for dividers.                                            */
+  --w98-groove: inset 0 -1px var(--w98-white), inset 0 1px var(--w98-shadow);
+}
+
+/* --- 1b. Discord's variables. ------------------------------------------------
+   Every name below was confirmed in a live client dump (2026-10-25). Old
+   names like --background-primary, --header-primary, --text-normal,
+   --interactive-normal and --background-modifier-* no longer exist; their
+   replacements are --background-base-*, --text-strong/--text-default,
+   --interactive-text-* / --interactive-icon-* and --interactive-background-*.
+   (Never write "*" directly followed by "/" in a comment here: that ends
+   the comment early and silently drops the whole rule below it.)
+
+   Discord defines these on <html> (classes like "theme-dark theme-darker")
+   and again on nested theme containers (popouts, modals), with its own
+   !important rules. To beat those, each selector carries two :not(#id)
+   clauses: they match every element (no element has those ids) but add
+   ID-level specificity, which no class-based Discord rule can outrank.       */
+:root:not(#w98-a):not(#w98-b),
+[class*="theme-"]:not(#w98-a):not(#w98-b),
+[class*="visual-refresh"]:not(#w98-a):not(#w98-b) {
+  /* Frame: the outermost layer is the teal desktop. --background-base-lowest
+     is NOT used for that, because Discord also paints the channel and DM
+     lists with it; the server column gets teal directly in section 3.       */
+  --app-frame-background:    var(--w98-desktop) !important;
+  --app-frame-border:        transparent !important;
+  --background-base-lowest:  var(--w98-face) !important;
+
+  /* Surfaces: everything else is silver.                                     */
+  --background-base-lower:      var(--w98-face) !important;
+  --background-base-low:        var(--w98-face) !important;
+  --background-surface-high:    var(--w98-face) !important;
+  --background-surface-higher:  var(--w98-face) !important;
+  --background-surface-highest: var(--w98-face) !important;
+  --background-secondary-alt:   var(--w98-face) !important;
+  --background-accent:          var(--w98-shadow) !important;
+  --bg-surface-raised:          var(--w98-face) !important;
+  --custom-bg-surface-overlay:  var(--w98-face) !important;
+  --chat-background:            var(--w98-face) !important;
+  --chat-background-default:    var(--w98-face) !important;
+  --chat-border:                transparent !important;
+  --channel-background-default: var(--w98-face) !important;
+  --custom-channel-members-bg:  var(--w98-face) !important;
+  --home-background:            var(--w98-face) !important;
+  --modal-background:           var(--w98-face) !important;
+  --modal-footer-background:    var(--w98-face) !important;
+  --card-background-default:    var(--w98-face) !important;
+  --card-border-default:        var(--w98-shadow) !important;
+  --embed-background:           var(--w98-face) !important;
+  --embed-background-alternate: var(--w98-face) !important;
+  --background-code:            var(--w98-white) !important;
+  --custom-notice-background:   var(--w98-face) !important;
+
+  /* Hover / pressed / selected. Win98 selection is solid navy.               */
+  --background-mod-muted:   rgba(0, 0, 0, 0.04) !important;
+  --background-mod-subtle:  rgba(0, 0, 0, 0.08) !important;
+  --background-mod-normal:  rgba(0, 0, 0, 0.14) !important;
+  --background-mod-strong:  rgba(0, 0, 0, 0.20) !important;
+  --interactive-background-default:  transparent !important;
+  --interactive-background-hover:    rgba(0, 0, 0, 0.08) !important;
+  --interactive-background-active:   rgba(0, 0, 0, 0.14) !important;
+  --interactive-background-selected: var(--w98-select) !important;
+
+  /* Messages.                                                                */
+  --message-background-hover:              rgba(0, 0, 0, 0.06) !important;
+  --message-mentioned-background-default:  rgba(255, 255, 0, 0.25) !important;
+  --message-mentioned-background-hover:    rgba(255, 255, 0, 0.35) !important;
+  --message-highlight-background-default:  rgba(0, 0, 128, 0.10) !important;
+  --message-highlight-background-hover:    rgba(0, 0, 128, 0.15) !important;
+  --mention-background:                    rgba(0, 0, 128, 0.12) !important;
+  --keyword-highlight-background:          rgba(255, 255, 0, 0.45) !important;
+
+  /* Inputs: white fields, no borders (the sunken bevel draws the edge).      */
+  --input-background-default:      var(--w98-white) !important;
+  --input-border-default:          transparent !important;
+  --input-border-hover:            transparent !important;
+  --input-border-active:           transparent !important;
+  --input-border-readonly:         transparent !important;
+  --input-text-default:            var(--w98-text) !important;
+  --input-icon-default:            var(--w98-text) !important;
+  --input-placeholder-text-default: var(--w98-shadow) !important;
+  --channeltextarea-background:    var(--w98-white) !important;
+  --channel-text-area-placeholder: var(--w98-shadow) !important;
+  --custom-input-background-color:   var(--w98-white) !important;
+  --custom-input-border-color:       transparent !important;
+  --custom-input-hover-border-color: transparent !important;
+  --custom-input-focus-border-color: transparent !important;
+  --custom-input-text-color:         var(--w98-text) !important;
+
+  /* Buttons ("controls" in the new design system): all plain gray.           */
+  --control-primary-background-default:   var(--w98-face) !important;
+  --control-primary-background-hover:     var(--w98-face) !important;
+  --control-primary-background-active:    var(--w98-face) !important;
+  --control-primary-border-default:       transparent !important;
+  --control-primary-border-hover:         transparent !important;
+  --control-primary-border-active:        transparent !important;
+  --control-primary-text-default:         var(--w98-text) !important;
+  --control-primary-text-hover:           var(--w98-text) !important;
+  --control-primary-text-active:          var(--w98-text) !important;
+  --control-primary-icon-default:         var(--w98-text) !important;
+  --control-primary-icon-hover:           var(--w98-text) !important;
+  --control-primary-icon-active:          var(--w98-text) !important;
+  --control-secondary-background-default: var(--w98-face) !important;
+  --control-secondary-background-hover:   var(--w98-face) !important;
+  --control-secondary-background-active:  var(--w98-face) !important;
+  --control-secondary-border-default:     transparent !important;
+  --control-secondary-border-hover:       transparent !important;
+  --control-secondary-border-active:      transparent !important;
+  --control-secondary-text-default:       var(--w98-text) !important;
+  --control-secondary-text-hover:         var(--w98-text) !important;
+  --control-secondary-text-active:        var(--w98-text) !important;
+  --control-secondary-icon-default:       var(--w98-text) !important;
+  --control-secondary-icon-hover:         var(--w98-text) !important;
+  --control-secondary-icon-active:        var(--w98-text) !important;
+  /* Destructive buttons stay gray too, but with dark red text.               */
+  --control-critical-primary-background-default:   var(--w98-face) !important;
+  --control-critical-primary-background-hover:     var(--w98-face) !important;
+  --control-critical-primary-background-active:    var(--w98-face) !important;
+  --control-critical-primary-border-default:       transparent !important;
+  --control-critical-primary-border-hover:         transparent !important;
+  --control-critical-primary-border-active:        transparent !important;
+  --control-critical-primary-text-default:         #800000 !important;
+  --control-critical-primary-text-hover:           #800000 !important;
+  --control-critical-primary-text-active:          #800000 !important;
+  --control-critical-primary-icon-default:         #800000 !important;
+  --control-critical-primary-icon-hover:           #800000 !important;
+  --control-critical-primary-icon-active:          #800000 !important;
+  --control-critical-secondary-background-default: var(--w98-face) !important;
+  --control-critical-secondary-background-hover:   var(--w98-face) !important;
+  --control-critical-secondary-background-active:  var(--w98-face) !important;
+  --control-critical-secondary-border-default:     transparent !important;
+  --control-critical-secondary-border-hover:       transparent !important;
+  --control-critical-secondary-border-active:      transparent !important;
+  --control-critical-secondary-text-default:       #800000 !important;
+  --control-critical-secondary-text-hover:         #800000 !important;
+  --control-critical-secondary-text-active:        #800000 !important;
+  --control-critical-secondary-icon-default:       #800000 !important;
+  --control-critical-secondary-icon-hover:         #800000 !important;
+  --control-critical-secondary-icon-active:        #800000 !important;
+  --redesign-button-tertiary-background:         var(--w98-face) !important;
+  --redesign-button-tertiary-pressed-background: var(--w98-face) !important;
+  --redesign-button-tertiary-text:               var(--w98-text) !important;
+  --redesign-button-tertiary-pressed-text:       var(--w98-text) !important;
+
+  /* Checkboxes and radios: white box, gray edge. Checked state keeps navy.   */
+  --checkbox-background-default: var(--w98-white) !important;
+  --checkbox-background-hover:   var(--w98-white) !important;
+  --checkbox-background-active:  var(--w98-white) !important;
+  --checkbox-border-default:     var(--w98-shadow) !important;
+  --checkbox-border-hover:       var(--w98-shadow) !important;
+  --checkbox-border-active:      var(--w98-shadow) !important;
+  --checkbox-background-selected-default: var(--w98-select) !important;
+  --checkbox-background-selected-hover:   var(--w98-select) !important;
+  --checkbox-border-selected-default:     var(--w98-select) !important;
+  --checkbox-border-selected-hover:       var(--w98-select) !important;
+  --radio-background-default: var(--w98-white) !important;
+  --radio-background-hover:   var(--w98-white) !important;
+  --radio-background-active:  var(--w98-white) !important;
+  --radio-border-default:     var(--w98-shadow) !important;
+  --radio-border-hover:       var(--w98-shadow) !important;
+  --radio-border-active:      var(--w98-shadow) !important;
+
+  /* Reactions: little gray buttons; your own reactions get a navy edge.      */
+  --reaction-background-default:         var(--w98-face) !important;
+  --reaction-background-hover:           var(--w98-light) !important;
+  --reaction-background-active:          var(--w98-face) !important;
+  --reaction-background-reacted-default: var(--w98-light) !important;
+  --reaction-background-reacted-hover:   var(--w98-white) !important;
+  --reaction-border-default:             var(--w98-shadow) !important;
+  --reaction-border-hover:               var(--w98-shadow) !important;
+  --reaction-border-active:              var(--w98-dark) !important;
+  --reaction-border-reacted-default:     var(--w98-select) !important;
+  --reaction-text-default:               var(--w98-text) !important;
+  --reaction-text-hover:                 var(--w98-text) !important;
+  --reaction-text-active:                var(--w98-text) !important;
+  --reaction-text-reacted-default:       var(--w98-select) !important;
+
+  /* Text. Black for everything readable; dark gray for "muted".              */
+  --text-default:    var(--w98-text) !important;
+  --text-strong:     var(--w98-text) !important;
+  --text-muted:      #404040 !important;
+  --text-subtle:     #404040 !important;
+  --chat-text-muted: #404040 !important;
+  --text-link:       var(--w98-link) !important;
+  --icon-link:       var(--w98-link) !important;
+  --text-code:       var(--w98-text) !important;
+  --channels-default: var(--w98-text) !important;
+  --channel-icon:     var(--w98-text) !important;
+  --guild-header-text-shadow: none !important;
+
+  /* Icons and interactive text.                                              */
+  --interactive-text-default: var(--w98-text) !important;
+  --interactive-text-hover:   var(--w98-text) !important;
+  --interactive-text-active:  var(--w98-text) !important;
+  --interactive-icon-default: var(--w98-text) !important;
+  --interactive-icon-hover:   var(--w98-text) !important;
+  --interactive-icon-active:  var(--w98-text) !important;
+  --interactive-muted:        var(--w98-shadow) !important;
+  --icon-default: var(--w98-text) !important;
+  --icon-strong:  var(--w98-text) !important;
+  --icon-muted:   #404040 !important;
+  --icon-subtle:  #404040 !important;
+
+  /* Borders and shadows. Bevels replace all of these.                        */
+  --border-muted:  var(--w98-shadow) !important;
+  --border-subtle: var(--w98-shadow) !important;
+  --border-normal: var(--w98-shadow) !important;
+  --border-strong: var(--w98-dark) !important;
+  --border-focus:  var(--w98-text) !important;
+  --shadow-border:          0 0 0 0 transparent !important;
+  --legacy-elevation-border: 0 0 0 0 transparent !important;
+
+  /* Scrollbars (fallback colours; section 8 does the real work).             */
+  --scrollbar-thin-thumb:  var(--w98-face) !important;
+  --scrollbar-thin-track:  transparent !important;
+  --scrollbar-auto-thumb:  var(--w98-face) !important;
+  --scrollbar-auto-track:  var(--w98-light) !important;
+  --scrollbar-auto-scrollbar-color-thumb: var(--w98-face) !important;
+  --scrollbar-auto-scrollbar-color-track: var(--w98-light) !important;
+
+  /* Corner radii: all square.                                                */
+  --radius-none:  0 !important;
+  --radius-xs:    0 !important;
+  --radius-sm:    0 !important;
+  --radius-md:    0 !important;
+  --radius-lg:    0 !important;
+  --radius-xl:    0 !important;
+  --radius-xxl:   0 !important;
+  --radius-round: 0 !important;
+  --button-border-radius:          0 !important;
+  --button-border-radius-lg:       0 !important;
+  --custom-border-radius:          0 !important;
+  --custom-input-border-radius:    0 !important;
+  --custom-scrollbar-border-radius: 0 !important;
+  --custom-app-top-bar-item-radius: 0 !important;
+
+  /* Fonts.                                                                   */
+  --font-primary:  var(--w98-font) !important;
+  --font-headline: var(--w98-font) !important;
+  --font-code:     var(--w98-font-mono) !important;
+}
+
+
+/* =============================================================================
+   2. GLOBAL RESETS
+   ============================================================================= */
+
+/* No rounded corners anywhere. Avatars and server icons stay round because
+   they're clipped by SVG masks, not border-radius (see section 8 to change). */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* Crisp, un-smoothed pixel text. */
+body,
+[class*="markup_"],
+[class*="messageContent_"] {
+  font-family: var(--w98-font) !important;
+  -webkit-font-smoothing: none !important;
+  color: var(--w98-text);
+}
+
+code,
+pre,
+[class*="codeBlockText_"],
+[class*="inlineCode_"] {
+  font-family: var(--w98-font-mono) !important;
+}
+
+::selection {
+  background: var(--w98-select) !important;
+  color: var(--w98-select-text) !important;
+}
+
+
+/* =============================================================================
+   3. LAYOUT SURFACES
+   ============================================================================= */
+
+/* Outermost frame = the teal desktop. */
+html,
+body,
+#app-mount,
+[class^="app_"], [class*=" app_"],
+[class^="bg_"], [class*=" bg_"] {
+  background-color: var(--w98-desktop) !important;
+}
+
+/* Server list sits directly on the desktop, like desktop icons. */
+nav[class*="guilds_"],
+[class^="guilds_"], [class*=" guilds_"] {
+  background: var(--w98-desktop) !important;
+}
+
+/* Channel sidebar: a raised window. The word-boundary match keeps this from
+   also hitting "sidebarList_", "sidebarListRounded_", etc. */
+[class^="sidebar_"], [class*=" sidebar_"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-window) !important;
+  padding: 3px !important;
+  border: none !important;
+}
+
+[class^="sidebarList_"], [class*=" sidebarList_"] {
+  background-color: var(--w98-face) !important;
+  border: none !important;
+}
+
+/* Main chat area: another window. */
+[class^="chat_"], [class*=" chat_"],
+[class^="page_"], [class*=" page_"] {
+  background-color: var(--w98-face) !important;
+  border: none !important;
+}
+
+[class^="chat_"], [class*=" chat_"] {
+  box-shadow: var(--w98-window) !important;
+  padding: 3px !important;
+}
+
+/* Member list: same silver, separated from chat by a groove. */
+[class^="membersWrap_"], [class*=" membersWrap_"],
+[class^="members_"], [class*=" members_"],
+[class*="memberListWrap"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: inset 1px 0 var(--w98-shadow), inset 2px 0 var(--w98-white) !important;
+}
+
+/* User panel at the bottom of the sidebar: styled like the taskbar. */
+[class^="panels_"], [class*=" panels_"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-raised) !important;
+  border: none !important;
+  margin: 2px !important;
+}
+
+/* Rich embeds: raised cards. Keeps Discord's coloured left stripe. */
+[class*="embedFull_"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-raised) !important;
+}
+
+
+/* =============================================================================
+   4. BEVELED POPUPS: menus, popouts, dialogs, tooltips
+   ============================================================================= */
+
+/* Context menus, emoji/GIF pickers, user popouts, modals. */
+[class^="menu_"], [class*=" menu_"],
+[class*="popout_"],
+[class*="userPopout"],
+[class*="userProfileOuter_"],
+[class*="contentWrapper_"][class*="picker"],
+[role="dialog"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-window), 2px 2px 0 rgba(0, 0, 0, 0.35) !important;
+  border: none !important;
+}
+
+/* Menu items: navy highlight with white text on hover/focus. */
+[class^="menu_"] [class*="item_"][class*="focused_"],
+[class*=" menu_"] [class*="item_"][class*="focused_"],
+[class^="menu_"] [class*="item_"]:hover,
+[class*=" menu_"] [class*="item_"]:hover {
+  background-color: var(--w98-select) !important;
+  color: var(--w98-select-text) !important;
+  --text-default: var(--w98-select-text);
+  --interactive-text-default: var(--w98-select-text);
+  --interactive-text-hover: var(--w98-select-text);
+  --interactive-icon-default: var(--w98-select-text);
+  --interactive-icon-hover: var(--w98-select-text);
+  --icon-default: var(--w98-select-text);
+}
+
+/* Menu separators as grooves. */
+[class^="menu_"] [class*="separator_"],
+[class*=" menu_"] [class*="separator_"] {
+  border: none !important;
+  height: 2px !important;
+  box-shadow: var(--w98-groove) !important;
+  background: transparent !important;
+}
+
+/* Tooltips: classic pale yellow with a black border. */
+[class^="tooltip_"], [class*=" tooltip_"] {
+  background-color: var(--w98-tooltip) !important;
+  color: var(--w98-text) !important;
+  border: 1px solid var(--w98-text) !important;
+  box-shadow: none !important;
+  --text-default: var(--w98-text);
+  --text-strong: var(--w98-text);
+}
+
+[class*="tooltipPointer_"] {
+  display: none !important;
+}
+
+
+/* =============================================================================
+   5. TITLE BARS (navy gradient)
+   ============================================================================= */
+
+/* Channel header, server-name header, the app's own top bar.
+   - Channel/Friends header: the "themed_" container whose direct child is
+     "upperContainer_" (confirmed in a live client). The two lines after it
+     are fallbacks in case that structure changes.
+   - Top bar: there are two "bar_" classes in the client, so we only take the
+     one that holds the window buttons ("winButtons_"). */
+[class*="themed_"]:has(> [class*="upperContainer_"]),
+[class^="header_"]:has([class*="headerContent_"]),
+[class*=" header_"]:has([class*="headerContent_"]),
+section[class^="title_"], section[class*=" title_"],
+section:has([class*="titleWrapper_"]):not(:has(section)),
+[class^="sidebar_"] header, [class*=" sidebar_"] header,
+div[class^="bar_"]:has([class*="winButtons_"]),
+div[class*=" bar_"]:has([class*="winButtons_"]) {
+  background: linear-gradient(90deg, var(--w98-title-start), var(--w98-title-end)) !important;
+  color: var(--w98-select-text) !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+  border: none !important;
+
+  /* Flip text/icon variables to white for everything inside a title bar. */
+  --text-default:     var(--w98-select-text);
+  --text-strong:      var(--w98-select-text);
+  --text-muted:       var(--w98-light);
+  --text-subtle:      var(--w98-light);
+  --channel-icon:     var(--w98-select-text);
+  --channels-default: var(--w98-select-text);
+  --interactive-text-default: var(--w98-select-text);
+  --interactive-text-hover:   var(--w98-select-text);
+  --interactive-text-active:  var(--w98-select-text);
+  --interactive-icon-default: var(--w98-select-text);
+  --interactive-icon-hover:   var(--w98-select-text);
+  --interactive-icon-active:  var(--w98-select-text);
+  --icon-default:     var(--w98-select-text);
+  --icon-strong:      var(--w98-select-text);
+  --icon-muted:       var(--w98-light);
+  --icon-subtle:      var(--w98-light);
+}
+
+/* Discord re-sets icon/text colours locally inside the channel header, so the
+   variables above don't reach everything. Paint headings, titles and icons
+   white directly, except inside the search box and the selected (gray) tab. */
+:is([class*="themed_"]:has(> [class*="upperContainer_"]),
+    [class^="header_"]:has([class*="headerContent_"]),
+    [class*=" header_"]:has([class*="headerContent_"]))
+  :is(h1, h2, h3, svg, [class*="title_"], [class*="titleWrapper_"], [class*="iconWrapper_"])
+  :not([class*="search"] *, [class*="selected_"] *, [class*="selected_"]) {
+  color: var(--w98-select-text) !important;
+}
+
+/* Vertical divider between the header title and its toolbar icons: a thin
+   etched line, like a Win98 toolbar separator. */
+[class*="upperContainer_"] [class*="divider_"] {
+  width: 2px !important;
+  background: transparent !important;
+  box-shadow: inset 1px 0 var(--w98-shadow), inset -1px 0 var(--w98-white) !important;
+  border: none !important;
+}
+
+/* The thin divider Discord draws under the channel header. */
+section[class^="title_"]::after,
+section[class*=" title_"]::after {
+  display: none !important;
+}
+
+/* The server-name header draws a frosted "glass" layer and ellipse glows over
+   its background (and over a server banner, if there is one). Hide them so
+   the title bar gradient shows through. */
+[class*="headerGlass_"],
+[class*="headerEllipseBackdrop_"],
+[class*="headerEllipseForeground_"] {
+  display: none !important;
+}
+
+/* Tabs inside a header (Friends: Online / All / Pending ...): white text on
+   the navy bar; the selected tab becomes a raised gray button. */
+[class*="upperContainer_"] [class*="item_"][class*="themed_"] {
+  color: var(--w98-select-text) !important;
+  background: transparent !important;
+}
+
+[class*="upperContainer_"] [class*="item_"][class*="themed_"]:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+[class*="upperContainer_"] [class*="item_"][class*="themed_"][class*="selected_"] {
+  background: var(--w98-face) !important;
+  color: var(--w98-text) !important;
+  box-shadow: var(--w98-raised) !important;
+  --text-default: var(--w98-text);
+  --interactive-text-default: var(--w98-text);
+  --interactive-text-active: var(--w98-text);
+}
+
+/* Min / max / close buttons in the top bar: small raised gray buttons. */
+[class^="winButton_"], [class*=" winButton_"] {
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-raised) !important;
+  color: var(--w98-text) !important;
+  width: 16px !important;
+  height: 14px !important;
+  margin: 0 1px !important;
+  top: 0 !important;
+}
+
+[class^="winButton_"]:active, [class*=" winButton_"]:active {
+  box-shadow: var(--w98-pressed) !important;
+}
+
+[class^="winButton_"] svg, [class*=" winButton_"] svg {
+  color: var(--w98-text) !important;
+  fill: var(--w98-text) !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+[class*="winButtonClose_"]:hover {
+  background-color: var(--w98-face) !important; /* no red close-hover */
+}
+
+
+/* =============================================================================
+   6. INPUTS (white, sunken)
+   ============================================================================= */
+
+/* Message box. */
+[class^="channelTextArea_"], [class*=" channelTextArea_"] {
+  background: transparent !important;
+}
+
+[class^="channelTextArea_"] [class^="scrollableContainer_"],
+[class*=" channelTextArea_"] [class*=" scrollableContainer_"],
+[class*="channelTextArea_"] [class*="scrollableContainer_"] {
+  background-color: var(--w98-white) !important;
+  box-shadow: var(--w98-sunken) !important;
+  border: none !important;
+}
+
+/* Inner layer that carries the input's own background colour. */
+[class*="channelTextArea_"] [class*="themedBackground_"] {
+  background-color: var(--w98-white) !important;
+}
+
+/* Fade gradient Discord paints behind the input; it would show as a dark
+   smear over the silver chat. */
+[class*="chatGradient"] {
+  display: none !important;
+}
+
+[class*="channelTextArea_"] [class*="placeholder_"] {
+  color: var(--w98-shadow) !important;
+}
+
+/* Search bars, text fields, text areas, selects. Also resets the text colour
+   for the search box that lives inside the (white-text) channel header. */
+[class*="searchBar_"],
+[class*="search_"] [class*="searchBar"],
+[class*="inputDefault_"],
+[class*="inputWrapper_"] input,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+[class*="select_"][class*="lookFilled"],
+[class*="quickswitcher_"] input {
+  background-color: var(--w98-white) !important;
+  color: var(--w98-text) !important;
+  box-shadow: var(--w98-sunken) !important;
+  border: none !important;
+  --text-default: var(--w98-text);
+  --text-strong: var(--w98-text);
+  --text-muted: var(--w98-shadow);
+  --interactive-text-default: var(--w98-text);
+  --interactive-icon-default: var(--w98-text);
+  --icon-default: var(--w98-text);
+  --icon-muted: var(--w98-shadow);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--w98-shadow) !important;
+}
+
+/* Code blocks look like a sunken text field. */
+pre,
+[class*="codeContainer_"],
+[class*="markup_"] code.hljs {
+  background-color: var(--w98-white) !important;
+  box-shadow: var(--w98-sunken) !important;
+  border: none !important;
+  color: var(--w98-text) !important;
+}
+
+[class*="markup_"] code:not(.hljs) {
+  background-color: var(--w98-white) !important;
+  border: 1px solid var(--w98-shadow) !important;
+  color: var(--w98-text) !important;
+}
+
+/* Checkboxes: square white box. */
+[class*="checkbox_"] {
+  background-color: var(--w98-white) !important;
+  box-shadow: var(--w98-sunken) !important;
+  border: none !important;
+}
+
+
+/* =============================================================================
+   7. BUTTONS (gray, raised)
+   -----------------------------------------------------------------------------
+   Targets Discord's real text buttons, not every clickable icon:
+   - old Button component: "button__xxxx" + "lookFilled_"/"lookOutlined_"
+     ("lookBlank_" is the icon-only variant and is left alone)
+   - new design-system button: a <button> whose child is "buttonChildrenWrapper_"
+   Colours also come from the --control-* variables in section 1b.
+   ============================================================================= */
+
+button:has(> [class*="buttonChildrenWrapper_"]),
+button[class*="lookFilled_"],
+button[class*="lookOutlined_"],
+button[class*="button_"][class*="colorBrand_"],
+button[class*="button_"][class*="colorPrimary_"],
+button[class*="button_"][class*="colorRed_"],
+button[class*="button_"][class*="colorGreen_"],
+button[class*="button_"][class*="colorTransparent_"],
+[data-mana-component="button"],
+[class*="buttonContainer_"] > button {
+  background: var(--w98-face) !important;
+  color: var(--w98-text) !important;
+  box-shadow: var(--w98-raised) !important;
+  border: none !important;
+  min-height: 23px !important;
+  padding: 0 12px !important;
+  font-family: var(--w98-font) !important;
+  font-weight: 400 !important;
+  text-shadow: none !important;
+  --text-default: var(--w98-text);
+  --interactive-text-default: var(--w98-text);
+  --interactive-icon-default: var(--w98-text);
+  --icon-default: var(--w98-text);
+}
+
+button:has(> [class*="buttonChildrenWrapper_"]):hover,
+button[class*="lookFilled_"]:hover,
+button[class*="lookOutlined_"]:hover,
+[data-mana-component="button"]:hover {
+  background: var(--w98-face) !important; /* Win98 buttons don't light up */
+}
+
+button:has(> [class*="buttonChildrenWrapper_"]):active,
+button[class*="lookFilled_"]:active,
+button[class*="lookOutlined_"]:active,
+button[class*="button_"][class*="color"]:active,
+[data-mana-component="button"]:active {
+  box-shadow: var(--w98-pressed) !important;
+}
+
+/* Keyboard focus: dotted rectangle inside the button. */
+button:has(> [class*="buttonChildrenWrapper_"]):focus-visible,
+button[class*="lookFilled_"]:focus-visible,
+button[class*="lookOutlined_"]:focus-visible,
+[data-mana-component="button"]:focus-visible {
+  outline: 1px dotted var(--w98-text) !important;
+  outline-offset: -4px !important;
+}
+
+button:disabled,
+button[class*="disabled_"] {
+  color: var(--w98-shadow) !important;
+  text-shadow: 1px 1px 0 var(--w98-white) !important;
+}
+
+/* Inner label wrappers sometimes carry their own colour. */
+button[class*="lookFilled_"] [class*="contents_"],
+[data-mana-component="button"] * {
+  color: inherit !important;
+}
+
+
+/* =============================================================================
+   8. SCROLLBARS
+   -----------------------------------------------------------------------------
+   Discord's scrollers carry a type class: "thin_" (8px), "auto_" (16px) or
+   "none_" (hidden), plus one-off hidden ones that set width 0 / display none.
+   - Size: only "thin_" / "auto_" scrollers are forced to 16px. Everything
+     else gets 16px as a plain default, so Discord's own "hide this" rules
+     (more specific) still win and hidden scrollbars stay hidden.
+   - Scrollers that run under an overlay (chat, server column, channel/DM
+     list) are shortened instead; see the end of this section.
+   ============================================================================= */
+
+/* Transparent base: where Discord's track margin leaves an empty stretch
+   (e.g. beside the message box) the panel colour shows, not a stray strip. */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+  background-color: transparent !important;
+}
+
+[class*="thin_"]:not([class*="none_"])::-webkit-scrollbar,
+[class*="auto_"]:not([class*="none_"])::-webkit-scrollbar,
+[class*="scrollbarDefault_"]::-webkit-scrollbar {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Dithered track, like the real thing. */
+::-webkit-scrollbar-track {
+  background-color: var(--w98-light) !important;
+  background-image: conic-gradient(var(--w98-white) 25%, var(--w98-face) 0 50%,
+                                   var(--w98-white) 0 75%, var(--w98-face) 0) !important;
+  background-size: 2px 2px !important;
+  background-clip: border-box !important;
+  border: none !important;
+  border-radius: 0 !important;
+  visibility: visible !important; /* Discord hides some until hover ("fade_") */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--w98-face) !important;
+  background-image: none !important;
+  background-clip: border-box !important;
+  box-shadow: var(--w98-raised) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  min-height: 16px !important;
+  visibility: visible !important;
+}
+
+::-webkit-scrollbar-corner {
+  background-color: var(--w98-face) !important;
+}
+
+/* Arrow buttons at each end. */
+::-webkit-scrollbar-button:single-button {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-color: var(--w98-face) !important;
+  box-shadow: var(--w98-raised) !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+::-webkit-scrollbar-button:single-button:active {
+  box-shadow: var(--w98-pressed) !important;
+  background-position: calc(50% + 1px) calc(50% + 1px) !important;
+}
+
+::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z' fill='black'/></svg>") !important;
+}
+
+::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z' fill='black'/></svg>") !important;
+}
+
+::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M3 0h1v7H3V6H2V5H1V4H0V3h1V2h1V1h1z' fill='black'/></svg>") !important;
+}
+
+::-webkit-scrollbar-button:single-button:horizontal:increment {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z' fill='black'/></svg>") !important;
+}
+
+/* In the 2025 layout some lists scroll underneath an overlay: the chat under
+   the message box, and the server column + channel/DM list under the user
+   panel. Discord hides that with a track margin, but Chromium always draws
+   the down arrow at the very bottom of the scroller, behind the overlay.
+   So instead we shorten those scrollers to end where the overlay begins, and
+   drop Discord's track margins there. Measured on a live client:
+   - message box overlaps the chat scroller by 16px
+   - user panel needs 66px clearance from the sidebar's bottom edge for the
+     server column; the channel/DM list already gets ~50px from a wrapper,
+     so it only needs 16px more                                              */
+/* --w98-scroll-inset adds a small gap at both ends so the bars don't butt
+   against the header or the overlay. */
+[class*="messagesWrapper_"] > [class*="scroller"] {
+  top: var(--w98-scroll-inset) !important;
+  bottom: calc(16px + var(--w98-scroll-inset)) !important;
+  height: auto !important;
+}
+
+[class*="guilds_"][class*="wrapper_"] {
+  margin-top: var(--w98-scroll-inset) !important;
+  margin-bottom: calc(66px + var(--w98-scroll-inset)) !important;
+}
+
+[class^="sidebarList_"], [class*=" sidebarList_"] {
+  margin-bottom: calc(16px + var(--w98-scroll-inset)) !important;
+}
+
+/* The top gap goes on the scroller itself, not the list block: the block
+   also holds the search bar / server header above the scroller. */
+[class*="sidebarList_"] [class*="scrollerBase_"] {
+  margin-top: var(--w98-scroll-inset) !important;
+}
+
+/* Member list: padding on the wrapper shrinks the scroller inside it,
+   whether Discord sizes it with height:100% or flex. */
+[class^="membersWrap_"], [class*=" membersWrap_"] {
+  padding-block: var(--w98-scroll-inset) !important;
+  box-sizing: border-box !important;
+}
+
+[class*="messagesWrapper_"] > [class*="scroller"]::-webkit-scrollbar-track,
+[class^="sidebar_"] [class*="scroller"]::-webkit-scrollbar-track,
+[class*=" sidebar_"] [class*="scroller"]::-webkit-scrollbar-track {
+  margin: 0 !important;
+}
+
+/* Message box: Discord keeps a transparent scrollbar there that only matters
+   for very long messages. No arrows, no track; just a raised thumb when the
+   text actually overflows. */
+[class*="scrollableContainer_"]::-webkit-scrollbar-button:single-button {
+  display: none !important;
+}
+
+[class*="scrollableContainer_"]::-webkit-scrollbar,
+[class*="scrollableContainer_"]::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+
+/* =============================================================================
+   9. MISC
+   ============================================================================= */
+
+/* Selected channel / DM: navy bar with white text, like a selected list item. */
+[class*="modeSelected_"],
+[class*="modeSelected_"] *,
+[class*="selected_"][class*="interactive_"],
+[class*="selected_"][class*="interactive_"] * {
+  color: var(--w98-select-text) !important;
+  --channels-default:   var(--w98-select-text);
+  --channel-icon:       var(--w98-select-text);
+  --interactive-text-default: var(--w98-select-text);
+  --interactive-text-hover:   var(--w98-select-text);
+  --interactive-text-active:  var(--w98-select-text);
+  --interactive-icon-default: var(--w98-select-text);
+  --interactive-icon-hover:   var(--w98-select-text);
+  --interactive-icon-active:  var(--w98-select-text);
+  --icon-default:       var(--w98-select-text);
+  --text-default:       var(--w98-select-text);
+  --text-strong:        var(--w98-select-text);
+}
+
+/* Category headings ("TEXT CHANNELS") and member-list group headings
+   ("ONLINE — 12") in black bold, not shouty gray. */
+[class*="containerDefault_"] h3,
+[class*="mainContent_"] h3,
+[class*="membersGroup_"],
+[class*="membersGroup_"] * {
+  color: var(--w98-text) !important;
+  font-weight: 700 !important;
+}
+
+/* Date dividers and the "new messages" bar as grooves. */
+[class*="divider_"][class*="hasContent_"] {
+  border-top: none !important;
+  box-shadow: var(--w98-groove) !important;
+}
+
+[class*="divider_"] [class*="content_"] {
+  background-color: var(--w98-face) !important;
+  color: var(--w98-text) !important;
+}
+
+/* Links inside messages only. Sidebar rows (DMs, Nitro, Shop) are <a> too. */
+[class*="markup_"] a,
+[class*="markup_"] [class*="anchor_"],
+[class*="embed"] a {
+  color: var(--w98-link) !important;
+}
+
+/* Kill the soft drop shadows Discord puts under headers and panels. */
+[class*="elevationLow_"],
+[class*="elevationHigh_"],
+[class*="elevationBorderLow_"],
+[class*="elevationBorderHigh_"] {
+  box-shadow: none !important;
+}
+
+/* Typing indicator, reply bar, attach bar above the input sit on silver. */
+[class*="typing_"],
+[class*="attachedBars_"],
+[class*="replyBar_"] {
+  background-color: var(--w98-face) !important;
+  color: var(--w98-text) !important;
+}
+
+
+/* =============================================================================
+   10. OPTIONAL: square avatars and server icons
+   -----------------------------------------------------------------------------
+   Discord clips these with SVG masks, so border-radius can't touch them.
+   Uncomment to remove the masks. Status dots will then overlap the corner.
+   ============================================================================= */
+
+/*
+foreignObject[mask] {
+  mask: none !important;
+}
+*/
